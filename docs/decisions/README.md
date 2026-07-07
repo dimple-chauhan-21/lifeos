@@ -35,6 +35,7 @@ Terminology used below follows [`docs/product/00_Glossary.md`](../product/00_Glo
 | [DEC-010](./DEC-010-mvp-supporting-entities.md) | MVP includes Insurance Policy, Expense, Document, and Contact alongside Vehicle, not Vehicle alone | Approved | 2026-07-02 |
 | [DEC-011](./DEC-011-fold-activity-audit-module.md) | `Activity & Audit` is folded into Dashboard (Recent Activity) and Settings (Audit Log), not kept as a standalone module | Approved | 2026-07-02 |
 | [DEC-012](./DEC-012-remove-entity-settings-tab.md) | `Entity Settings` is removed as a standalone Capability Tab; Archive/Delete move to a `⋮` overflow menu on Entity Overview | Approved | 2026-07-02 |
+| [DEC-013](./DEC-013-v1-backup-strategy.md) | V1 backups: automated daily Postgres dumps to a local Docker-mounted directory, kept provider-agnostic for future cloud storage | Approved | 2026-07-02 |
 
 ## Adding a New Decision
 

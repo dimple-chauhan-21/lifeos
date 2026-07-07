@@ -6,11 +6,11 @@
 |---|---|
 | Document | Product Glossary |
 | File | `docs/product/00_Glossary.md` |
-| Version | 1.0 |
+| Version | 1.1 |
 | Status | Draft |
 | Owner | Product Team |
 | Last Updated | 2026-07-02 |
-| Depends On | `01_Product_Vision.md`, `02_Product_Requirements_Document.md`, `03_Feature_Catalogue.md` |
+| Depends On | `01_Product_Vision.md`, `02_Product_Requirements_Document.md`, `03_Feature_Catalogue.md`, `docs/architecture/01_System_Architecture.md` |
 | Used By | All Product, Design & Engineering Documents |
 
 ---
@@ -28,7 +28,7 @@ Each term includes a **Definition**, its **Purpose** (why the concept exists), i
 | Term | Definition | Purpose | Scope | Examples | Notes |
 |---|---|---|---|---|---|
 | **Product** | LifeOS itself — the complete system being designed and built. | Names the whole so every other term can be scoped beneath it. | Entire system. | "LifeOS is a self-hosted personal operating system." | — |
-| **Module** | A navigable area of the product, typically grouping related Entity Types or a cross-cutting capability. | Organizes the product into a structure users can navigate. | Product-level; no implementation implication. | Assets, Finance, Dashboard. | See also *Domain*. |
+| **Module** (formally **Product Module**) | A navigable area of the product, typically grouping related Entity Types or a cross-cutting capability. | Organizes the product into a structure users can navigate. | Product-level; no implementation implication. | Assets, Finance, Dashboard. | See also *Domain*, *Package* (Section 10). In Engineering documents, referred to explicitly as **Product Module** to avoid confusion with a code **Package** — see `docs/architecture/01_System_Architecture.md`, Section 2. Within Product/Design documents alone, plain "Module" remains unambiguous and is used as-is. |
 | **Feature** | A specific, describable piece of functionality. | The unit at which product decisions are scoped and prioritized. | Can be domain-specific or platform-wide. | "Vehicle: Odometer Log," "Global Search." | Every Capability is a Feature; not every Feature is a Capability. |
 | **Capability** | A platform-level Feature that applies generically across many Entity Types. | The reusable building block that makes LifeOS platform-first rather than module-first. | Cross-cutting; defined once, applied everywhere relevant. | Attachments, Timeline, Reminders. | See also *Generic Capability* (Section 2) — same concept, not a separate one. |
 | **Domain** | A subject area of a person's life represented by one or more Entity Types within a Module. | Groups Entity Types that share real-world context. | Usually maps one-to-one with a Module. | Assets domain, Finance domain. | Module is the navigable UI grouping; Domain is the subject-matter grouping it represents. |
@@ -76,8 +76,9 @@ Each term includes a **Definition**, its **Purpose** (why the concept exists), i
 | Term | Definition | Purpose | Scope | Examples | Notes |
 |---|---|---|---|---|---|
 | **Timeline** | The chronological feed of everything that happened to a specific Entity — system-generated and user-logged events combined. | Answers "when did this happen" for a given entity. | One per Entity Instance. | "Serviced — 2026-03-10," "Insurance renewed — 2026-01-05." | See also *Event*, *Activity*. |
-| **Activity** | A system-generated record that something changed on an Entity (created, edited, archived, related). | The automatic, non-editable side of what appears on a Timeline. | One per change, per Entity Instance. | "Odometer field edited by user — 2026-06-01." | All Activity appears on the Timeline; not everything on the Timeline is Activity (a manually logged service is not). |
-| **Audit Log** | A separate, security-focused, immutable log of sensitive system events. | Security and compliance visibility, distinct from product-data change tracking. | System-wide, viewable in Settings > Security — not per-entity. | Login, failed login, data export, sensitive field access. | Distinct from Activity Log: Audit Log tracks security events; Activity Log tracks data changes. |
+| **Activity** | A system-generated record that something changed on an Entity (created, edited, archived, related). | The automatic, non-editable side of what appears on a Timeline. | One per change, per Entity Instance. | "Odometer field edited by user — 2026-06-01." | All Activity appears on the Timeline; not everything on the Timeline is Activity (a manually logged service is not). Not to be confused with **Operational Logging** (below) — a completely different, non-product-facing concept. |
+| **Audit Log** | A separate, security-focused, immutable log of sensitive system events. | Security and compliance visibility, distinct from product-data change tracking. | System-wide, viewable in Settings > Security — not per-entity. | Login, failed login, data export, sensitive field access. | Distinct from Activity Log: Audit Log tracks security events; Activity Log tracks data changes. Also distinct from **Operational Logging** (below), which is not security-focused and not user-visible at all. |
+| **Operational Logging** | Structured, engineering-facing log output (request logs, error stack traces, background job execution logs) written for developers and operators — never shown to an end user anywhere in the product. | Diagnoses and monitors system behavior at the infrastructure level. | System-wide; written to stdout/container logs, not stored in any product-facing table. | A request log line: `GET /api/v1/vehicles/{id} 200 42ms`. | **Not to be confused with Activity or Audit Log** — Operational Logging is never shown to a user and is never written to the `activity_log` or `audit_log` tables. See `docs/architecture/01_System_Architecture.md`, Section 10. This is an engineering-only concept, included here specifically to prevent it from being confused with the two product-facing log concepts above. |
 | **Event** | A single occurrence recorded on a Timeline — the generic term covering both Activity entries and user-logged entries. | The atomic unit a Timeline is built from. | One per occurrence. | A single logged service record is one Event. | See also *Timeline*, *Activity*. |
 | **History** | Informal, general term for the accumulated record of Events for an entity. | Casual shorthand only. | — | "Check the vehicle's history" = check its Timeline. | Not a distinct data concept — use *Timeline* or *Activity History* in formal writing; "History" is not introduced as a separate system. |
 | **Change Log** | Not a LifeOS product concept. Reserved for documentation/engineering release notes about the software itself. | Avoids confusing product entity history with software release notes. | Project documentation only, not product data. | A `CHANGELOG.md` describing software releases. | Explicitly excluded from entity-level vocabulary — do not use for entity history; see Timeline/Activity/Audit Log instead. |
@@ -163,6 +164,7 @@ These definitions describe concepts at a product level only — no implementatio
 | **Configuration** | The product-level description of how a given Entity Type uses the Platform Layer — which Capabilities apply, which Custom Fields exist by default, its icon/label. | Names the mechanism by which a new Entity Type is "added" without new Platform work. | Per Entity Type. | Property's Configuration marks it as supporting Expenses and Relationships, with a default Custom Field for "Ownership Type." | — |
 | **Reference Implementation** | The first Entity Type built to fully exercise the Platform Layer, validating it before reuse elsewhere. | Proves the platform is genuinely generic before it's relied upon. | Currently: Vehicle. | See `docs/decisions/DEC-001-vehicle-reference-implementation.md`. | — |
 | **Reusable Component** | Any Capability, pattern, or Configuration convention designed from the outset to be used by more than one Entity Type. | The general principle underlying Platform Layer design decisions. | System-wide. | The Standard Entity Capability Set is a set of Reusable Components. | Product-level framing of reuse — not a statement about code structure. |
+| **Package** | A code-level unit of organization (a Python or TypeScript directory) implementing either the Platform Layer or one Domain Layer Entity Type. | Names the actual code organization the Platform Layer / Domain Layer split is implemented as. | One package per Domain Entity Type, plus the Platform Layer's own packages. | `apps/api/app/domains/vehicles/`, `apps/api/app/platform/attachments/`. | **Not to be confused with the product-level Module** (Section 1, formally Product Module) — see `docs/architecture/01_System_Architecture.md`, Section 2, which introduced this distinction. A Product Module (e.g., "Assets") typically maps to *several* Packages (one per Entity Type it owns), never the reverse. |
 
 ---
 
@@ -174,12 +176,16 @@ These definitions describe concepts at a product level only — no implementatio
 | Task | Goal, Reminder, Checklist |
 | Attachment | Document, File, Media |
 | Timeline | Activity, Event, Audit Log |
-| Activity | Audit Log, Event |
+| Activity | Audit Log, Event, Operational Logging |
+| Audit Log | Activity, Operational Logging |
+| Operational Logging | Activity, Audit Log |
 | Tag | Category, Label |
 | Notification | Alert, Reminder |
 | Capability | Generic Capability, Platform Layer |
 | Domain Entity | Platform Entity, Reference Implementation |
 | Relationship | System Relationship, Custom Relationship, Parent Entity, Child Entity |
+| Module (Product Module) | Domain, Package |
+| Package | Platform Layer, Domain Layer, Module |
 
 ---
 
@@ -195,20 +201,24 @@ While assembling this glossary, the following overlaps and ambiguities were iden
 | "Change Log" could be mistaken for entity-level history | Scoped explicitly to software release notes, not product data, to prevent collision with Timeline/Activity/Audit Log. |
 | "Project," "Budget," and "Insight" were requested as terms but have no corresponding Entity Type or capability in `01`–`03` | Documented as **reserved, not currently defined**, with a pointer to the relevant Product Boundary (Budget, Insight) or a note to define deliberately via Decision Log before use (Project) — rather than silently inventing scope that hasn't been approved. |
 | "Insurance" (as requested) vs. the actual Entity Type name | Clarified that the formal Entity Type is **Insurance Policy**; "Insurance" is the general concept, not the record name. |
+| "Module" (product-level, Section 1) risked colliding with **Package** (a code-level directory), once Engineering documents began referring to code organization | Introduced **Package** as a new, distinct term (Section 10) and clarified that "Module" is formally **Product Module** in Engineering contexts specifically to avoid the collision — resolved in `docs/architecture/01_System_Architecture.md`, Section 2, and canonicalized here. |
+| **Operational Logging** (an engineering-only concept — request logs, stack traces, job logs) risked being conflated with **Activity** or **Audit Log** (both product-facing, both also "a log of things that happened") | Added **Operational Logging** as its own term (Section 4) with explicit "not to be confused with" notes on all three entries — resolved in `docs/architecture/01_System_Architecture.md`, Section 10, and canonicalized here. |
 
-No further unresolved overlaps were identified. The `docs/decisions/` folder uses a `README.md` index plus one file per decision (`DEC-001` … `DEC-010`) — confirmed as the standing format; `README.md` serves as the Decision Log index referenced below.
+No further unresolved overlaps were identified. The `docs/decisions/` folder uses a `README.md` index plus one file per decision (`DEC-001` … `DEC-013`) — confirmed as the standing format; `README.md` serves as the Decision Log index referenced below.
 
 ---
 
 ## Document Status
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft
 **Dependencies:**
 - `docs/product/01_Product_Vision.md`
 - `docs/product/02_Product_Requirements_Document.md`
 - `docs/product/03_Feature_Catalogue.md`
+- `docs/architecture/01_System_Architecture.md`
 
 **Generated On:** 2026-07-02
+**Revision Note:** v1.1 adds **Package** (Section 10) and **Operational Logging** (Section 4) as new canonical terms, and clarifies **Module** as formally **Product Module** in Engineering contexts — canonicalizing the two naming-collision resolutions first identified in `docs/architecture/01_System_Architecture.md`.
 
-**Next Document:** `docs/decisions/README.md` (Decision Log index — already established; see individual `DEC-001`–`DEC-010` records)
+**Next Document:** `docs/architecture/02_Database_Architecture.md`

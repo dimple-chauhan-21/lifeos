@@ -52,3 +52,40 @@ tooling only — no application frameworks yet. apps/web: TypeScript
 Python 3.13 via uv, Ruff 0.15.20, mypy 2.1.0 (strict). Throwaway
 example files validate the full pipeline; removed in Phases 1.3/1.4.
 ```
+
+---
+
+## Phase 1.3 - Backend Bootstrap
+
+Completed:
+- Removed `apps/api/app/example.py` (the Phase 1.2 placeholder — cleaned up at the start of this phase, per the refined rule to not let placeholders outlive the phase that created them)
+- Added FastAPI 0.139.0 + `uvicorn[standard]` 0.50.2 as runtime dependencies; Pydantic 2.13.4 and Starlette 1.3.1 resolved transitively by FastAPI (not pinned directly, per FastAPI's own guidance to let it manage those)
+- Added pytest 9.1.1 as a dev dependency
+- Created `app/main.py`: a FastAPI instance with a single `/health` endpoint — nothing else (no routers, no DB, no auth yet)
+- Created `tests/test_health.py`: one passing test
+- Added `pythonpath = ["."]` to `[tool.pytest.ini_options]` so `tests/` can import `app` without a package install step
+
+Two things caught only by actually running verification, not assumed from documentation:
+1. `from app.main import app` failed in pytest with `ModuleNotFoundError` until `pythonpath = ["."]` was added — the project has no build-system/packaging step yet, so pytest didn't know to put the project root on `sys.path`.
+2. Starlette's `TestClient` emits a deprecation warning for `httpx`, pointing at `httpx2`. **Initially swapped to `httpx2`, then reverted after deeper verification requested during review** (see Correction below) — kept on `httpx` 0.28.1, accepting the (cosmetic, non-functional) warning.
+
+**Correction, made before approval:** the initial swap to `httpx2` was based on the warning's own wording and `httpx2`'s self-description, not on official documentation. Checked against primary sources on request:
+- FastAPI's official testing docs (fastapi.tiangolo.com) still explicitly instruct `pip install httpx` — no mention of `httpx2`.
+- `httpx` (`encode/httpx`) is not deprecated as a project — only its use as Starlette's `TestClient` backend specifically is warned against.
+- `httpx2` support in Starlette's `TestClient` traces to one merged PR plus a single terse maintainer reply in a GitHub discussion — no migration guide, rationale, or stability/timeline commitment published anywhere found.
+- Conclusion: not an officially documented ecosystem recommendation yet. Reverted to `httpx` 0.28.1 per the standing preference for ecosystem stability over early adoption of a newer package. The warning is harmless and can be revisited once (if) FastAPI's own documentation adopts `httpx2`.
+
+Verified beyond the test suite: booted a real `uvicorn` process and confirmed `GET /health` returns `200 {"status": "ok"}` over actual HTTP, not just via `TestClient`.
+
+Commit:
+```
+feat(api): bootstrap FastAPI application with health endpoint
+
+Add FastAPI 0.139.0 + uvicorn[standard] 0.50.2 as the first runtime
+dependencies. app/main.py exposes a single /health endpoint — no
+routing, database, or auth yet (later phases). Add pytest 9.1.1 and
+httpx 0.28.1 (per FastAPI's official docs, despite Starlette's
+TestClient httpx2 deprecation warning — not yet an officially
+documented ecosystem recommendation, see CHANGELOG for verification).
+Fix pytest module resolution via pythonpath.
+```

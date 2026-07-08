@@ -89,3 +89,42 @@ TestClient httpx2 deprecation warning — not yet an officially
 documented ecosystem recommendation, see CHANGELOG for verification).
 Fix pytest module resolution via pythonpath.
 ```
+
+---
+
+## Phase 1.4 - Frontend Bootstrap
+
+Completed:
+- Removed `apps/web/src/example.ts` (the Phase 1.2 placeholder — cleaned up at the start of this phase)
+- Added Next.js 16.2.10 + React/React DOM 19.2.7 as runtime dependencies
+- Added Vitest 4.1.10, `@vitejs/plugin-react` 6.0.3, Testing Library (`@testing-library/react` 16.3.2, `@testing-library/jest-dom` 6.9.1), `jsdom` 29.1.1, and matching `@types/*` as dev dependencies
+- Created `app/layout.tsx` + `app/page.tsx`: one placeholder page rendering "LifeOS" — no routing, styling, or state yet
+- Created `vitest.config.ts` + `vitest.setup.ts`, and one smoke test (`app/page.test.tsx`) rendering the page
+- Scope held to the lazy-dependency principle: no Tailwind, shadcn/ui, Zustand, TanStack Query, React Hook Form, or Zod — none needed for a single placeholder page
+
+Versions verified directly against the npm registry, not search summaries — two corrections this surfaced:
+1. A blog post referenced "Next.js 16.3", but `16.3.0` doesn't exist as a stable release — only `16.3.0-preview.x`/`-canary.x`. Used `16.2.10` (the registry's actual `latest` tag).
+2. `@types/node`'s "latest" resolved to `26.x`, matching Node 26 — but Phase 1.2 deliberately pinned Node 24 LTS. Used `@types/node` `24.13.2` to match the runtime actually in use, not the newest major.
+
+**Dropped mid-implementation, after verification:** initially added `eslint-config-next` 16.2.10 for Next.js-specific lint rules. Its own peer range (`eslint: ">=9.0.0"`) technically allows ESLint 10, but its transitive plugins (`eslint-plugin-import`, `eslint-plugin-jsx-a11y`, `eslint-plugin-react`) only declare support up to ESLint `^9`, and running it crashed with `TypeError: scopeManager.addGlobals is not a function` — a real internal-API break, not a benign warning. Rather than downgrade the ESLint 10.6.0 already verified in Phase 1.2, removed `eslint-config-next` (it wasn't required for this phase's actual goal) and kept the existing typescript-eslint-only config, which lints the new `.tsx` files cleanly. Revisit once Next.js's own ESLint config supports ESLint 10.
+
+Two gaps only caught by actually running the tooling, not assumed:
+1. Prettier had no `.prettierignore` and started formatting-checking `.next/` build output (148 files) the moment a real build existed. Added `apps/web/.prettierignore` (`.next/`, `node_modules/`, `dist/`).
+2. Adding `"incremental": true` to `tsconfig.json` (required by Next.js) produces `tsconfig.tsbuildinfo`, which wasn't gitignored. Added `*.tsbuildinfo` to the root `.gitignore`.
+
+`tsconfig.json` was also auto-updated by Next.js itself on first build (mandatory: `jsx` → `react-jsx`; suggested: `allowJs: true`, additional `include` entries) — expected, standard first-build behavior, not reverted.
+
+Verified beyond the test suite: ran both `next build && next start` and `next dev` as real processes and confirmed `GET /` returns `200` with the actual rendered page (`<title>LifeOS</title>`, `<main>LifeOS</main>`) over real HTTP, not just via the component test.
+
+Commit:
+```
+feat(web): bootstrap Next.js application with placeholder page
+
+Add Next.js 16.2.10 + React 19.2.7 as the first runtime dependencies.
+app/page.tsx renders a single placeholder page — no routing, styling,
+or state yet (later phases). Add Vitest 4.1.10 + Testing Library for
+component testing, with one smoke test. Drop eslint-config-next after
+finding it crashes on ESLint 10 (transitive plugins cap at ESLint 9);
+revisit once it catches up. Add .prettierignore and *.tsbuildinfo to
+.gitignore, both gaps only surfaced by actually running the tooling.
+```

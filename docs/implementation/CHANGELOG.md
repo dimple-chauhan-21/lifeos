@@ -128,3 +128,53 @@ finding it crashes on ESLint 10 (transitive plugins cap at ESLint 9);
 revisit once it catches up. Add .prettierignore and *.tsbuildinfo to
 .gitignore, both gaps only surfaced by actually running the tooling.
 ```
+
+---
+
+## Phase 1.5 - Docker & Docker Compose
+
+Completed:
+- `infra/docker-compose.yml`: 5 services — `postgres`, `redis`, `minio`, `api`, `web` — with healthcheck-based `depends_on` throughout (no sleep delays). `worker`/`beat` deliberately deferred: no Celery code exists anywhere yet, and adding the services now would mean adding a stub task module just to give them something to run, violating the lazy-dependency principle. Revisit when a real background job is actually built.
+- `infra/.env.example` documenting every required variable
+- `apps/api/Dockerfile` + `.dockerignore` (uv-based, dev-oriented, live-reload via bind mount with `UV_PROJECT_ENVIRONMENT` kept outside the mounted path so installed deps aren't shadowed)
+- `apps/web/Dockerfile` + root `.dockerignore` (pnpm-based; build context is the repo root since `apps/web` is part of the pnpm workspace, not a standalone package)
+- `apps/api/app/core/config.py`: typed `Settings` (pydantic-settings 2.14.2) covering `database_url`, `redis_url`, and MinIO endpoint/credentials/bucket — fails fast if any is missing. Session-secret/cookie settings (also mentioned in `04_Backend_Architecture.md` §21) deliberately excluded — no consumer exists until the Auth phase.
+- `apps/api/tests/test_connectivity.py`: real smoke test connecting to actual Postgres (`asyncpg` 0.31.0), Redis (`redis` 8.0.1), and MinIO (`minio` 7.2.20) — no mocks, consistent with the project's own stated integration-test philosophy (`00_Engineering_Overview.md` §17)
+
+Versions verified against official/primary sources, not assumed from the architecture doc's "16+"/generic naming:
+- PostgreSQL: `postgres:18` (Docker Hub's actual latest stable)
+- Redis: `redis:8.8` — verified its licensing history first: reverted to a tri-license (RSALv2/SSPLv1/**AGPLv3**) as of Redis 8.0, AGPLv3 being OSI-approved open source again. Safe to use as the actively-maintained current stable.
+- MinIO: **found the `minio/minio` GitHub repo now says "THIS REPOSITORY IS NO LONGER MAINTAINED"** — the vendor pivoted to a commercial "AIStor" product. Flagged to you directly rather than silently picking a replacement; you chose to pin the last published community tag (`RELEASE.2025-09-07T16-13-09Z`). Logged as technical debt with classification **Upstream Framework Limitation** — see `TECHNICAL_DEBT.md`.
+
+Two scope judgment calls, confirmed with you before implementing:
+1. `worker`/`beat` deferred (see above).
+2. `apps/api/app/core/config.py` included in this same phase rather than split out, since it's needed to actually satisfy this phase's own smoke-test requirement.
+
+Two real bugs caught only by actually running things, not by reading docs/config in advance:
+1. Postgres exited on first start with `postgres-1 | Error: in 18+, these Docker images are configured to store database data in a format which is compatible with "pg_ctlcluster"...`. PostgreSQL 18 changed its expected volume mount point from `/var/lib/postgresql/data` to `/var/lib/postgresql`. References: [official `postgres` image docs, Docker Hub](https://hub.docker.com/_/postgres) ("The defined `VOLUME` was changed in 18 and above to `/var/lib/postgresql`. Mounts and volumes should be targeted at the updated location.") and [docker-library/postgres#1259](https://github.com/docker-library/postgres/pull/1259), the PR the container's own error message pointed to. Fixed and re-verified clean.
+2. The root `.gitignore`'s `.env.*` pattern was also silently matching `infra/.env.example` — the one `.env*` file that's *supposed* to be committed as a template. Added `!.env.example` to un-ignore it; confirmed via `git check-ignore` before and after.
+
+Verified beyond `docker compose up` succeeding: `postgres`, `redis`, `minio`, and `api` all report `healthy` via their own healthchecks; `GET /health` (API), `GET /` (web, rendering the real page), and MinIO's console all returned `200` over real HTTP from the host; the connectivity smoke test plus the full existing test suite (4 tests) both passed running *inside* the live `api` container against the real `postgres`/`redis`/`minio` containers, not mocks. Docker itself wasn't installed on this machine at the start of this phase — paused and waited for it to be installed before running any of the above, rather than claiming success without testing.
+
+Commit:
+```
+feat(infra): add Docker Compose stack (postgres, redis, minio, api, web)
+
+Add infra/docker-compose.yml with healthcheck-gated startup ordering
+and infra/.env.example. Add dev Dockerfiles for apps/api (uv-based)
+and apps/web (pnpm-based, root build context). Add apps/api/app/core/
+config.py: typed, fail-fast Settings for DB/Redis/MinIO. Add a real
+connectivity smoke test (asyncpg, redis, minio clients — no mocks).
+
+Pin postgres:18, redis:8.8 (verified AGPLv3 post-license-reversal),
+and minio RELEASE.2025-09-07T16-13-09Z (last community release before
+the minio/minio repo was marked unmaintained in favor of the vendor's
+commercial AIStor product — logged in TECHNICAL_DEBT.md). Defer
+worker/beat services until real Celery task code exists.
+
+Fix: Postgres 18 moved its expected volume mount point from
+/var/lib/postgresql/data to /var/lib/postgresql — caught only by
+actually running docker compose up, not from reading docs in advance.
+Fix: root .gitignore's .env.* pattern was silently ignoring
+infra/.env.example too; added a !.env.example negation.
+```

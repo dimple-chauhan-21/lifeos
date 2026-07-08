@@ -6,6 +6,10 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "fastapi==0.139.0",
     "uvicorn[standard]==0.50.2",
+    "pydantic-settings==2.14.2",
+    "asyncpg==0.31.0",
+    "redis==8.0.1",
+    "minio==7.2.20",
 ]
 
 [dependency-groups]
@@ -13,6 +17,7 @@ dev = [
     "httpx==0.28.1",
     "mypy==2.1.0",
     "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
     "ruff==0.15.20",
 ]
 
@@ -26,8 +31,14 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "asyncpg"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+asyncio_mode = "auto"
 

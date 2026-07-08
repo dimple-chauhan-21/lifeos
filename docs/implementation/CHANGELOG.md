@@ -178,3 +178,39 @@ actually running docker compose up, not from reading docs in advance.
 Fix: root .gitignore's .env.* pattern was silently ignoring
 infra/.env.example too; added a !.env.example negation.
 ```
+
+---
+
+## Phase 1.6 - Environment & Configuration
+
+**Scope, clarified before implementing:** Phase 1.5 already built `apps/api/app/core/config.py` (typed `Settings`) and proved it *could* connect via an isolated smoke test — but `app/main.py` never actually called it. The FastAPI app itself didn't consume `Settings` at all, so the architecture's "fails fast on missing configuration" requirement (`04_Backend_Architecture.md` §21) wasn't actually true for the running application, only for a test that happened to import `get_settings()` directly. Confirmed with you that closing this specific gap — not something broader like frontend env vars or auto-generated secrets — was this phase's scope.
+
+Completed:
+- Wired `get_settings()` into a FastAPI `lifespan` handler (`app/main.py`) — configuration is now loaded and validated at application startup, not lazily on first use.
+- Added real validation to `Settings` beyond mere presence (`app/core/config.py`): `database_url` must parse as a `postgresql://` URL, `redis_url` must parse as `redis://`, and the MinIO fields must not be blank. A required variable that's *set but empty or malformed* now fails just as loudly as one that's missing entirely.
+
+Verified, not assumed:
+- **A bare `TestClient(app)` (as `tests/test_health.py` already used, not as a context manager) does not trigger FastAPI's lifespan at all** — confirmed by running that test with every DB/Redis/MinIO env var unset and watching it still pass. This means the existing test's green status was never actually proof the app was configured correctly; the lifespan only fires for a real ASGI server (uvicorn) or a `with TestClient(app) as client:` context-manager usage. Documented here since it's a non-obvious gap between "test passes" and "app actually validates config."
+- Ran `uv run uvicorn app.main:app` locally with **zero** environment variables set: real crash — `pydantic_core.ValidationError: 6 validation errors for Settings` naming every missing field, `ERROR: Application startup failed. Exiting.`, connection refused on the port.
+- Ran the same with a syntactically-invalid `DATABASE_URL` (present but not a real Postgres URL): rejected with `Value error, database_url must be a postgresql:// URL` — proving "invalid," not just "missing," is caught.
+- **Inside real Docker** (per this phase's explicit instruction, not just locally): brought the full stack up clean first (all healthy, `/health` returns `200`), then ran `docker compose run --rm -e DATABASE_URL="" api` — the container's own logs showed the identical `ValidationError` and `Application startup failed. Exiting.`, and its healthcheck immediately reported `unhealthy`. One nuance worth recording: because the dev Dockerfile runs `uvicorn --reload`, the outer reloader-supervisor process doesn't itself exit non-zero on a startup crash (it stays "Up (unhealthy)" rather than "Exited") — the operator-visible signal in this dev setup is the healthcheck status and crash traceback in logs, not the container's exit code. This is expected `--reload` behavior, not a bug; noted so it isn't surprising later.
+- Ran the full existing test suite (4 tests) inside the live, correctly-configured container afterward — all still passing, no regressions.
+- No temporary verification code left behind: the broken-config checks above were ad hoc CLI invocations and a disposable `docker compose run` container, never committed to the repo.
+
+No new ecosystem incompatibility or architectural concern surfaced this phase requiring a `TECHNICAL_DEBT.md` entry.
+
+Commit:
+```
+feat(api): fail fast on missing or invalid configuration at startup
+
+Wire the existing Settings class into a FastAPI lifespan handler so
+app/main.py actually validates configuration at startup, instead of
+only being reachable through an isolated test. Add real validation
+beyond presence checks: database_url/redis_url must parse as
+postgresql:// and redis:// URLs; MinIO fields must not be blank.
+
+Verified with zero and with invalid env vars, both locally (uvicorn)
+and inside a real Docker container (docker compose run --rm -e
+DATABASE_URL="") — confirmed an actual startup crash naming the
+problem, not just a passing isolated test.
+```

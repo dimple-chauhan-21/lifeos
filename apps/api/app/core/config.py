@@ -28,9 +28,7 @@ class Settings(BaseSettings):
             raise ValueError("redis_url must be a redis:// URL")
         return v
 
-    @field_validator(
-        "minio_endpoint", "minio_access_key", "minio_secret_key", "minio_bucket_name"
-    )
+    @field_validator("minio_endpoint", "minio_access_key", "minio_secret_key", "minio_bucket_name")
     @classmethod
     def _validate_not_blank(cls, v: str) -> str:
         if not v.strip():

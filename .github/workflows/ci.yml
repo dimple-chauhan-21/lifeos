@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint:web
+      - run: pnpm run format:web
+      - run: pnpm run typecheck:web
+
+  lint-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          working-directory: apps/api
+      - run: uv sync
+        working-directory: apps/api
+      - run: uv run ruff check .
+        working-directory: apps/api
+      - run: uv run ruff format --check .
+        working-directory: apps/api
+      - run: uv run mypy .
+        working-directory: apps/api
+
+  test-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:web
+
+  test-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Start Postgres, Redis, MinIO
+        working-directory: infra
+        run: |
+          cp .env.example .env
+          docker compose up -d --wait postgres redis minio
+      - uses: astral-sh/setup-uv@v8.3.2
+        with:
+          working-directory: apps/api
+      - run: uv sync
+        working-directory: apps/api
+      - name: Run backend test suite
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql://lifeos:changeme-postgres-password@localhost:5432/lifeos
+          REDIS_URL: redis://:changeme-redis-password@localhost:6379/0
+          MINIO_ENDPOINT: localhost:9000
+          MINIO_ACCESS_KEY: lifeos
+          MINIO_SECRET_KEY: changeme-minio-password
+          MINIO_BUCKET_NAME: lifeos-attachments
+          MINIO_SECURE: "false"
+        run: uv run pytest
+      - name: Stop services
+        if: always()
+        working-directory: infra
+        run: docker compose down -v

@@ -8,11 +8,18 @@
     "node": ">=24"
   },
   "scripts": {
+    "prepare": "husky",
     "lint:web": "pnpm --filter web lint",
     "lint:api": "cd apps/api && uv run ruff check .",
     "format:web": "pnpm --filter web format",
     "format:api": "cd apps/api && uv run ruff format --check .",
     "typecheck:web": "pnpm --filter web typecheck",
-    "typecheck:api": "cd apps/api && uv run mypy ."
+    "typecheck:api": "cd apps/api && uv run mypy .",
+    "test:web": "pnpm --filter web test",
+    "test:api": "cd apps/api && uv run pytest"
+  },
+  "devDependencies": {
+    "husky": "9.1.7",
+    "lint-staged": "17.0.8"
   }
 }

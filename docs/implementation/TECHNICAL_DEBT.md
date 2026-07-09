@@ -37,3 +37,17 @@ A running log of known gaps, deferred work, and things deliberately left unresol
 **Current state:** `infra/docker-compose.yml` pins `minio/minio:RELEASE.2025-09-07T16-13-09Z` — the last tag the project published (Sept 2025) before archival. Fully functional, AGPLv3-licensed, verified working end-to-end in this phase (bucket listing, connectivity). It will not receive further security or bug fixes from upstream.
 
 **Resolution condition:** Revisit if either (a) a real security issue is found in this pinned MinIO release with no patched community version available, or (b) AIStor's Free tier's terms are verified in detail and found suitable (its account/registration requirements and exact feature parity with legacy MinIO were not fully verifiable from public docs at the time of this decision). Until then, the pinned release is the deliberate choice — do not silently swap to AIStor or a different object store (e.g., SeaweedFS, Garage) without flagging it, since that would revisit an architecture decision, not just a version bump.
+
+---
+
+## .github/dependabot.yml — apps/web excluded from dependency scanning (pnpm 11 lockfile format)
+
+**Logged:** Phase 1.7 - Git Hooks & CI (2026-07-08)
+
+**Classification:** Temporary Ecosystem Gap — Dependabot's parser hasn't caught up to pnpm 11's new lockfile format yet; actively tracked upstream with open issues, not a permanent limitation, and not something in our own control to fix.
+
+**Issue:** pnpm 11 changed `pnpm-lock.yaml` to a multi-document YAML file (an "env lockfile" document plus the regular project lockfile). Dependabot's `npm`-ecosystem parser (the value used for pnpm per [GitHub's own ecosystem support docs](https://docs.github.com/en/code-security/reference/supply-chain-security/supported-ecosystems-and-repositories), which lists supported pnpm versions as only v7–v10) does not yet handle this format — confirmed via open upstream issues [dependabot-core#14794](https://github.com/dependabot/dependabot-core/issues/14794) and [#14919](https://github.com/dependabot/dependabot-core/issues/14919) ("multi-document pnpm-lock.yaml reported as dependency_file_not_parseable").
+
+**Current state:** `.github/dependabot.yml` configures `uv` (native ecosystem, `apps/api`) and `github-actions` scanning, but deliberately excludes `apps/web`'s npm/pnpm dependencies. Per the standing rule against regressing a deliberately-chosen dependency version to satisfy a scanning tool, pnpm was **not** downgraded to v10 to work around this.
+
+**Resolution condition:** Add an `npm`-ecosystem entry for `apps/web` once Dependabot ships support for pnpm 11's lockfile format (tracked in the linked upstream issues) — check periodically, or when either issue closes.

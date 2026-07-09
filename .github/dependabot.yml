@@ -1,0 +1,16 @@
+version: 2
+
+updates:
+  - package-ecosystem: "uv"
+    directory: "/apps/api"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # apps/web (npm/pnpm) intentionally excluded — Dependabot does not yet
+  # support pnpm 11's multi-document pnpm-lock.yaml format.
+  # See docs/implementation/TECHNICAL_DEBT.md.

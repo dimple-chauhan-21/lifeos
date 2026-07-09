@@ -66,7 +66,10 @@ Full architecture: [`docs/architecture/`](docs/architecture/). Product and desig
 **Prerequisites:**
 
 - [Node.js 24](https://nodejs.org/) (pinned in `.nvmrc`)
-- [pnpm 11.10.0](https://pnpm.io/) (pinned in `package.json`'s `packageManager` field — run via `corepack enable` to get the exact version automatically)
+- [pnpm 11.10.0](https://pnpm.io/) (pinned in `package.json`'s `packageManager` field) — install however you prefer:
+  - `corepack enable` (bundled with Node up to v24; on Node 25+ it's a separate install: `npm install -g corepack` — note this can conflict with an existing Homebrew-installed pnpm, in which case skip corepack and use one of the options below instead)
+  - Homebrew: `brew install pnpm`
+  - `npm install -g pnpm@11.10.0`
 - [Python 3.13](https://www.python.org/) via [uv](https://docs.astral.sh/uv/) (uv manages the Python install itself — no separate Python install needed)
 - [Docker](https://www.docker.com/) with Docker Compose
 
@@ -77,7 +80,6 @@ git clone https://github.com/dimple-chauhan-21/lifeos.git
 cd lifeos
 
 # Install JS/TS dependencies (also installs the pre-commit git hook)
-corepack enable
 pnpm install
 
 # Install Python dependencies

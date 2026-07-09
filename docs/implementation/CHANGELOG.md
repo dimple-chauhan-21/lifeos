@@ -214,3 +214,60 @@ and inside a real Docker container (docker compose run --rm -e
 DATABASE_URL="") — confirmed an actual startup crash naming the
 problem, not just a passing isolated test.
 ```
+
+---
+
+## Phase 1.7 - Git Hooks & CI
+
+**Scope, clarified before implementing:** repo already has a real GitHub remote (`dimple-chauhan-21/lifeos`), which shaped how this phase was verified — "does the CI pipeline actually run" can only be proven on GitHub's own infrastructure, not locally, so verification included pushing a branch and opening a PR (both confirmed with you first).
+
+Completed:
+- **Git hooks**: Husky 9.1.7 + lint-staged 17.0.8. Pre-commit hook (`.husky/pre-commit`) runs `lint-staged` only — staged-file-scoped ESLint+Prettier for `apps/web/**/*.{ts,tsx}`, Ruff check+format for `apps/api/**/*.py`. No typecheck, no tests in the hook, per the explicit instruction to keep it fast; those run in CI only.
+- **CI** (`.github/workflows/ci.yml`): 4 parallel jobs — `lint-web`, `lint-api`, `test-web` (Vitest), `test-api` (pytest). `test-api` brings up Postgres/Redis/MinIO via `docker compose -f infra/docker-compose.yml` rather than GitHub Actions' native `services:` syntax, which can't express the password-protected Redis or MinIO's required command args — this reuses the exact same, already-verified service definitions instead of maintaining a second parallel definition.
+- **Dependabot** (`.github/dependabot.yml`): `uv` (native ecosystem, not `pip` — verified from Astral's own docs) for `apps/api`, plus `github-actions`. `apps/web` deliberately excluded — see Technical Debt below.
+- **README Getting Started section** — none existed before this phase; added since "verify on a clean clone" needs documented steps to follow, and Phase 1's own acceptance criteria requires this.
+
+Versions verified via GitHub's API directly (not marketplace listing pages): `actions/checkout@v7`, `actions/setup-node@v6`, `pnpm/action-setup@v6` (floating major-version tags, standard convention for these three), `astral-sh/setup-uv@v8.3.2` (pinned to the exact patch version, per Astral's own supply-chain-security recommendation for this specific action).
+
+**New Technical Debt entry** (classified per the standing rule): Dependabot does not yet support pnpm 11's new multi-document `pnpm-lock.yaml` format — confirmed via open upstream issues (dependabot-core#14794, #14919), not just assumed. Classified as **Temporary Ecosystem Gap**. `apps/web` is excluded from Dependabot scanning until this is fixed upstream; pnpm was **not** downgraded to v10 to work around it, per the standing rule against regressing a deliberately-chosen dependency to satisfy a scanning tool.
+
+Real gaps found only by actually running things end to end, not by reading docs/code in isolation:
+1. **README's `corepack enable` step failed outright**: this machine's active Node is v25.9.0 (not the project's pinned v24), and Node dropped bundling `corepack` starting v25 — confirmed via Node's own TSC announcement. The natural fallback, `npm install -g corepack`, then collided with an existing Homebrew-installed `pnpm` binary (`EEXIST`). Neither is a one-off fluke specific to this machine — both are realistic scenarios for any contributor using a newer Node or a Homebrew-installed pnpm. Fixed by not mandating corepack at all: the README now lists corepack, Homebrew, and `npm install -g pnpm@11.10.0` as equally valid options.
+2. **The pushed branch alone didn't trigger CI** — `ci.yml` only fires on `pull_request` or a push to `main`, so a feature-branch push produces zero workflow runs. Not a bug, just a real discovery about the pipeline's own configured behavior; resolved by opening a PR (with your approval) rather than by changing the trigger.
+3. **A real, previously-undetected bug**: `lint-api`'s `ruff format --check` failed on GitHub Actions — `app/core/config.py`'s `@field_validator(...)` decorator had been manually line-wrapped in Phase 1.6 on the (wrong) assumption it exceeded the 100-char limit. `ruff check` and `mypy` were run after that change, but `ruff format --check` was not, so it slipped through two full phases undetected until this CI pipeline actually exercised it. Fixed (`uv run ruff format .`), and this is exactly the kind of regression the CI pipeline exists to catch.
+4. Also caught during clean-clone verification: the previously-documented Phase 1.2 environment note (root-owned `~/.local` on this machine, needing `UV_PYTHON_INSTALL_DIR`/`UV_CACHE_DIR` redirected) still applies and would block `uv sync` on a truly fresh clone too — not a new finding, but reconfirmed; not fixed at the system level, consistent with that standing note.
+
+Verified, end to end, not assumed:
+- **Pre-commit hook, both ecosystems, both outcomes**: staged a `.ts` file with an unfixable ESLint violation (unused var) → commit correctly blocked, working tree cleanly reverted, confirmed via `git log`. Staged a `.py` file with an auto-fixable Ruff violation (unused import, bad spacing) → hook auto-fixed and the commit succeeded. All test files and commits removed afterward — nothing left in history.
+- **Full clean-clone verification**: fresh `git clone` into an isolated temp directory, followed only the new README steps — `pnpm install` (confirmed the Husky hook auto-installs via the `prepare` script), `uv sync`, `docker compose up --build`, confirmed `/health` and `/` both return real `200`s over HTTP, then ran every lint/typecheck/test command from the README (`lint:web`, `typecheck:web`, `test:web`, `lint:api`, `typecheck:api`) plus the full pytest suite inside the live container — all passing, from a directory that had never seen any of this session's prior state.
+- **CI actually running on GitHub's infrastructure, not just locally**: pushed `phase-1.7-git-hooks-ci`, confirmed (with your approval) that a push alone doesn't trigger it, had you open a PR, then polled the Actions API directly (`gh` wasn't available; the repo being public allowed unauthenticated polling) — first run genuinely failed on `lint-api` (the real bug above), fixed and pushed again, second run: all 4 jobs `success`.
+
+Commit:
+```
+feat(ci): add git hooks and GitHub Actions CI pipeline
+
+Add Husky + lint-staged (9.1.7 / 17.0.8) for a fast, staged-file-scoped
+pre-commit hook: ESLint+Prettier for apps/web, Ruff check+format for
+apps/api. No typecheck or tests in the hook — those run in CI only.
+
+Add .github/workflows/ci.yml: 4 parallel jobs (lint-web, lint-api,
+test-web, test-api). test-api brings up Postgres/Redis/MinIO via the
+existing infra/docker-compose.yml rather than redeclaring them in
+GitHub Actions' native services: syntax.
+
+Add .github/dependabot.yml: uv (apps/api) and github-actions
+ecosystems. apps/web excluded — Dependabot doesn't yet support pnpm
+11's lockfile format (Temporary Ecosystem Gap, logged in
+TECHNICAL_DEBT.md, not worked around by downgrading pnpm).
+
+Add README Getting Started section.
+
+Fix: apps/api/app/core/config.py had a ruff-format violation from
+Phase 1.6 that ruff check/mypy didn't catch — only found once this
+CI pipeline actually ran the formatter check for real.
+
+Verified: pre-commit hook blocks/auto-fixes correctly on both
+ecosystems; full clean-clone bring-up passes every check; pushed a
+branch and confirmed the pipeline actually passes on GitHub Actions
+(not just locally), including a first real failure caught and fixed.
+```

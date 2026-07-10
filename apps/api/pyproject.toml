@@ -10,6 +10,7 @@ dependencies = [
     "asyncpg==0.31.0",
     "redis==8.0.1",
     "minio==7.2.20",
+    "sqlalchemy[asyncio]==2.0.51",
 ]
 
 [dependency-groups]

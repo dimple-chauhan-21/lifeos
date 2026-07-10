@@ -7,7 +7,7 @@
 | Document | System Architecture |
 | File | `docs/architecture/01_System_Architecture.md` |
 | Version | 1.0 |
-| Status | Draft |
+| Status | Approved |
 | Owner | Engineering Team |
 | Last Updated | 2026-07-02 |
 | Depends On | `docs/architecture/00_Engineering_Overview.md`, `docs/product/00_Glossary.md`, `docs/decisions/DEC-001` |
@@ -295,7 +295,7 @@ No log destination beyond stdout is assumed — Docker's logging driver captures
 ## Document Status
 
 **Version:** 1.0
-**Status:** Draft
+**Status:** Approved
 **Dependencies:**
 - `docs/architecture/00_Engineering_Overview.md`
 - `docs/product/00_Glossary.md`
@@ -303,4 +303,4 @@ No log destination beyond stdout is assumed — Docker's logging driver captures
 
 **Generated On:** 2026-07-02
 
-**Next Document:** `docs/architecture/02_Database_Schema.md` — the `entities` base table, every Platform table, and the per-domain detail tables at the column level, building directly on the boundaries defined here.
+**Next Document:** `docs/architecture/02_Database_Architecture.md` — the `entities` base table, every Platform table, and the per-domain detail tables at the column level, building directly on the boundaries defined here.

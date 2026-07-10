@@ -271,3 +271,44 @@ ecosystems; full clean-clone bring-up passes every check; pushed a
 branch and confirmed the pipeline actually passes on GitHub Actions
 (not just locally), including a first real failure caught and fixed.
 ```
+
+---
+
+## Foundation Cleanup (post-Phase 1.7)
+
+Documentation-only pass following the Foundation Review — no application code, dependencies, or architecture changed. Every item traces to a specific finding from that review.
+
+Completed:
+- `PROJECT_STATUS.md`: was still showing "Current Phase: Phase 4 — Implementation Planning" with Phase 5 as three unchecked "Sprint 1/2/3" placeholders, seven approved sub-phases out of date. Updated to reflect Phase 4 (Roadmap) complete and Phase 5's Foundation sub-phases (1.1–1.7) complete, linking to `CHANGELOG.md` and `TECHNICAL_DEBT.md`; current phase now correctly points at Roadmap Phase 3 (Database Foundation) as next.
+- Fixed a broken cross-reference: `docs/architecture/01_System_Architecture.md`'s footer pointed to `docs/architecture/02_Database_Schema.md`, a file that has never existed — the real file is `02_Database_Architecture.md`.
+- `docs/architecture/01_System_Architecture.md` and `05_Frontend_Architecture.md` were both still marked `Status: Draft`, despite `PROJECT_STATUS.md` itself already asserting "Phase 3 – Engineering (Architecture) — Complete" and both documents having been relied on as binding, approved architecture across all seven Foundation sub-phases. Checked both documents' own Quality Review sections for any legitimate open blocker first — found none — then updated `Status: Draft` → `Approved` in both the header table and footer of each. No content changed, no version bump (a status correction, not a revision).
+- `docs/implementation/00_Implementation_Roadmap.md`: same reasoning — `Status: Draft` → `Approved`, since it has been the actively-executed source of truth for seven completed, individually-approved sub-phases. Its footer's "Next Document: None planned — upon approval, this roadmap becomes the source of truth for beginning Phase 1 implementation" was written for a future event that has since happened; reworded to state Phase 1–2 are complete and Phase 3 is next, pointing at `CHANGELOG.md`/`PROJECT_STATUS.md` for detail.
+- `05_Frontend_Architecture.md`'s footer said "Next Document: To be determined" — filled in with `docs/implementation/00_Implementation_Roadmap.md`, now that it's known.
+- `README.md` and this `CHANGELOG.md` were both re-verified against the current repository (scripts, ports, prerequisite versions, phase order) and found already accurate — no changes needed to either.
+- Added five entries to `TECHNICAL_DEBT.md`, all classified **Our Design Decision**, for the Foundation Review's remaining findings that weren't yet tracked anywhere: Docker images running as root (+ `web`'s missing healthcheck), no CORS middleware yet, configuration not yet DI-injected, `asyncpg`/`redis`/`minio` shipping as runtime dependencies ahead of any runtime caller, and secrets not yet auto-generated on first run. None of these were fixed — per this cleanup's own scope, they're future-phase work, now just no longer undocumented future-phase work.
+
+Explicitly not touched, per this cleanup's own scope: no Docker `USER` directives added, no CORS middleware written, no DI wiring changed, no dependencies added or removed, no application code modified.
+
+Commit:
+```
+docs: Foundation cleanup — sync status docs with completed Phase 1
+
+Update PROJECT_STATUS.md to reflect Phase 1 (Foundation, sub-phases
+1.1-1.7) and Phase 4 (Roadmap) as complete, current phase now Phase 3
+(Database Foundation). Fix a broken cross-reference in
+01_System_Architecture.md (pointed at a file that never existed:
+02_Database_Schema.md instead of 02_Database_Architecture.md).
+Correct stale Status: Draft on 01_System_Architecture.md,
+05_Frontend_Architecture.md, and 00_Implementation_Roadmap.md to
+Approved, matching how they've actually been relied on across all
+seven Foundation sub-phases (verified no open blocker in either
+document's own Quality Review first). Fill in
+05_Frontend_Architecture.md's "Next Document: To be determined".
+
+Add 5 TECHNICAL_DEBT.md entries (Our Design Decision) for previously
+undocumented, deliberately deferred items from the Foundation Review:
+Docker root user, missing CORS, config not yet DI-injected, early
+asyncpg/redis/minio dependencies, secrets not yet auto-generated.
+
+No application code, dependencies, or architecture changed.
+```

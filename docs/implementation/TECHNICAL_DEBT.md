@@ -51,3 +51,63 @@ A running log of known gaps, deferred work, and things deliberately left unresol
 **Current state:** `.github/dependabot.yml` configures `uv` (native ecosystem, `apps/api`) and `github-actions` scanning, but deliberately excludes `apps/web`'s npm/pnpm dependencies. Per the standing rule against regressing a deliberately-chosen dependency version to satisfy a scanning tool, pnpm was **not** downgraded to v10 to work around this.
 
 **Resolution condition:** Add an `npm`-ecosystem entry for `apps/web` once Dependabot ships support for pnpm 11's lockfile format (tracked in the linked upstream issues) — check periodically, or when either issue closes.
+
+---
+
+## apps/api, apps/web — Docker images run as root
+
+**Logged:** Foundation Review, post-Phase 1.7 (2026-07-10)
+
+**Classification:** Our Design Decision — both Dockerfiles are dev-oriented (bind-mounted source, hot reload) and were deliberately scoped to "get the stack running," not to be production-hardened; no production Dockerfile exists yet to inherit this.
+
+**Issue:** Neither `apps/api/Dockerfile` nor `apps/web/Dockerfile` declares a `USER`, so both containers run as root. Low risk today — local-only, bind-mounted dev images. The `web` service also has no healthcheck, unlike the other four services in `infra/docker-compose.yml`.
+
+**Resolution condition:** Add a non-root `USER` to both Dockerfiles, and a healthcheck to `web`, before either image is used as the basis for `docker-compose.prod.yml` (Roadmap Phase 18) or any real deployment.
+
+---
+
+## apps/api — No CORS middleware configured
+
+**Logged:** Foundation Review, post-Phase 1.7 (2026-07-10)
+
+**Classification:** Our Design Decision — appropriately not yet needed, since no real cross-origin browser call from `apps/web` to `apps/api` exists yet (the placeholder page makes no API calls).
+
+**Issue:** `04_Backend_Architecture.md` §12 lists CORS handling as required ASGI middleware ("applies to literally every request, no exceptions"). `app/main.py` has none yet.
+
+**Resolution condition:** Add CORS middleware the same phase real frontend-to-API browser calls are introduced — do not let it lag behind the first real fetch.
+
+---
+
+## apps/api — Configuration not yet injected via DI
+
+**Logged:** Foundation Review, post-Phase 1.7 (2026-07-10)
+
+**Classification:** Our Design Decision — there are no Services or Repositories yet for a config object to be injected into; `app/main.py`'s `lifespan` calling `get_settings()` directly is the only consumer today.
+
+**Issue:** `04_Backend_Architecture.md` §21 specifies the typed configuration object should be constructor-injected (`Depends()`), not imported/called globally, "which would make it harder to test with different configurations."
+
+**Resolution condition:** Route configuration access through FastAPI's DI the moment the first Service or Repository is written — don't let the direct-call pattern get copied into new code by precedent.
+
+---
+
+## apps/api — asyncpg, redis, minio ship as runtime dependencies with no runtime caller yet
+
+**Logged:** Foundation Review, post-Phase 1.7 (2026-07-10)
+
+**Classification:** Our Design Decision — all three were added specifically to deliver the connectivity smoke test required by Phase 1.5/1.6, ahead of any real domain code that will eventually use them for real.
+
+**Issue:** `asyncpg`, `redis`, and `minio` are listed under `[project.dependencies]` (shipped, not dev-only) in `apps/api/pyproject.toml`, but the only import of any of them today is in `tests/test_connectivity.py`. Not dead code — SQLAlchemy 2.0 async (the architecture's fixed ORM choice) pairs naturally with `asyncpg` as its driver — but worth naming so "no callers yet" isn't later mistaken for "unused, safe to remove."
+
+**Resolution condition:** No action required; this resolves itself naturally once the Database Foundation phase (Roadmap Phase 3) and real Redis/MinIO-consuming features are built. Revisit only if a real domain phase ends up choosing a different driver than expected.
+
+---
+
+## infra — Secrets are env-var driven but not yet auto-generated on first run
+
+**Logged:** Foundation Review, post-Phase 1.7 (2026-07-10)
+
+**Classification:** Our Design Decision — appropriate for local development; not yet a real deployment.
+
+**Issue:** `00_Engineering_Overview.md` §15/§16 both call for "secure values auto-generated on first run rather than defaulting to something insecure." Today `infra/.env.example` ships static, human-readable placeholders (e.g., `changeme-postgres-password`) that a person must remember to replace.
+
+**Resolution condition:** Implement first-run secret generation before any real (non-local-dev) deployment — tracked against the Roadmap's deployment/production-hardening phase (Phase 18), not before.

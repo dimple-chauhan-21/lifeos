@@ -7,7 +7,7 @@
 | Document | Frontend Architecture |
 | File | `docs/architecture/05_Frontend_Architecture.md` |
 | Version | 1.0 |
-| Status | Draft |
+| Status | Approved |
 | Owner | Engineering Team |
 | Last Updated | 2026-07-02 |
 | Depends On | `docs/architecture/00_Engineering_Overview.md`, `docs/architecture/03_API_Design.md`, `docs/architecture/04_Backend_Architecture.md`, `docs/design/00_Design_Handoff.md`, `docs/design/01_UX_Decision_Record.md` |
@@ -413,7 +413,7 @@ Mirrors `docs/architecture/04_Backend_Architecture.md`, Section 26, for the fron
 ## Document Status
 
 **Version:** 1.0
-**Status:** Draft
+**Status:** Approved
 **Dependencies:**
 - `docs/architecture/00_Engineering_Overview.md`
 - `docs/architecture/03_API_Design.md`
@@ -423,4 +423,4 @@ Mirrors `docs/architecture/04_Backend_Architecture.md`, Section 26, for the fron
 
 **Generated On:** 2026-07-02
 
-**Next Document:** To be determined — the core Engineering architecture phase (`00`–`05`) is now complete; implementation, or a further architecture document (e.g., DevOps/deployment runbook), can follow.
+**Next Document:** `docs/implementation/00_Implementation_Roadmap.md` — the core Engineering architecture phase (`00`–`05`) is complete; the Roadmap sequences it into implementation phases.

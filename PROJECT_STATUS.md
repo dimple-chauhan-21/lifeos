@@ -1,7 +1,7 @@
 # LifeOS Project Status
 
-**Last Updated:** 2026-07-10
-**Current Phase:** Phase 5 — Development (Foundation complete; Database Foundation next, per the Roadmap's Phase 3)
+**Last Updated:** 2026-07-13
+**Current Phase:** Phase 5 — Development (Database Foundation complete; Roadmap Phase 4 — Authentication & Audit Log — next)
 
 ---
 
@@ -47,14 +47,24 @@
 
 Full detail, verification, and reasoning for each sub-phase: [`docs/implementation/CHANGELOG.md`](docs/implementation/CHANGELOG.md). Known gaps deliberately deferred past Foundation: [`docs/implementation/TECHNICAL_DEBT.md`](docs/implementation/TECHNICAL_DEBT.md).
 
-### Database Foundation (Roadmap Phase 3) — Not started
-- [ ] Database Foundation
+### Database Foundation (Roadmap Phase 3) — Complete
+- [x] 3.1 — SQLAlchemy Engine & Session Foundation
+- [x] 3.2 — Alembic Infrastructure
+- [x] 3.3 — Users Table & First Migration
+- [x] 3.4 — Entity Types Registry
+- [x] 3.5 — Entities Table
+- [x] Database Foundation Review (independent audit — approved, 9.2/10)
+
+Full detail: [`docs/implementation/CHANGELOG.md`](docs/implementation/CHANGELOG.md). Deferred findings from the review: [`docs/implementation/TECHNICAL_DEBT.md`](docs/implementation/TECHNICAL_DEBT.md).
+
+### Roadmap Phase 4 — Authentication & Audit Log — Not started
+- [ ] Authentication & Audit Log
 
 ---
 
 ## Reference
 
-- Product/Architecture Decision Log: [`docs/decisions/`](docs/decisions/README.md) — 12 decisions recorded to date
+- Product/Architecture Decision Log: [`docs/decisions/`](docs/decisions/README.md) — 13 decisions recorded to date
 - Design Decision Log: [`design/decisions/`](design/decisions/README.md) — tactical design-execution decisions (`UX-044` onward), none recorded yet
 - Glossary (canonical terminology): [`docs/product/00_Glossary.md`](docs/product/00_Glossary.md)
 - Reference implementation: **Vehicle** (`docs/decisions/DEC-001-vehicle-reference-implementation.md`)

@@ -567,3 +567,48 @@ entity_type, bad lifecycle_state); incremental downgrade/upgrade
 confirmed entities is fully independent of entity_types/users; final
 autogenerate confirmed zero diff across the complete 3-table schema.
 ```
+
+---
+
+## Database Foundation Review / Cleanup
+
+An independent audit of Phase 3.1–3.5, followed by a documentation-only cleanup based on its findings. No application code, models, migrations, tests, dependencies, Docker, or CI were touched in either step.
+
+**Review** (full report: Database Foundation Review artifact): read all four architecture documents and all 13 Decision Records fresh, read every application file directly rather than trusting this changelog, and independently re-ran the full `downgrade base → upgrade head → downgrade -1 → upgrade head` cycle plus a fresh `--autogenerate` against live Docker Postgres. **Result: approved, 9.2/10.** Zero functional defects — every real bug found during 3.1–3.5 had already been caught and fixed within its own sub-phase, before commit. Four findings, all documentation gaps or low-severity forward-looking risks, none affecting correctness.
+
+**Cleanup, addressing those findings:**
+- `PROJECT_STATUS.md`: marked Database Foundation (3.1–3.5) and the Review complete; advanced the current phase to Roadmap Phase 4 (Authentication & Audit Log) — **not** the Vehicle domain, correcting an error in the review's own suggested commit message (Vehicle is Roadmap Phase 13; Phase 4 is the actual next phase per the Roadmap's own ordering, re-verified directly). Also corrected a stale, unrelated count in the same file's Reference section (claimed 12 Decision Records; 13 exist).
+- `docs/architecture/02_Database_Architecture.md` §15: the review's one Medium-severity finding — the document stated, unconditionally, that every table (including Platform tables) uses a UUID primary key, with no exception noted for `entity_types`' confirmed string natural key. Added the smallest possible clarification: one sentence in §15 itself, plus a matching parenthetical in the Quality Review section's own summary of the same claim (left unchanged everywhere else — no rewriting or expansion of unrelated sections).
+- `TECHNICAL_DEBT.md`: **unchanged**, after reconsidering. Two entries were initially added here for the review's remaining findings (`Entity.updated_at`'s ORM-only refresh; the absence of a written CHECK-constraint/index naming convention), then removed on external review of this cleanup itself: every one of this file's 8 existing entries tracks a genuine gap between the *implementation* and what the architecture calls for (Docker root user, missing CORS, missing DI, etc.) — these two were categorically different, a behavior note and a documentation-completeness observation, neither representing incomplete or deferred *work*. Forcing them into this file would have stretched its established scope rather than fit it. Both remain recorded in this changelog entry's narrative instead, which is the appropriate place for "here's something worth remembering" that isn't actually outstanding debt.
+- **Deliberately left unchanged, all three**: the `updated_at` ORM-only behavior, the constraint/index naming convention gap, and the review's fourth finding (FK constraints using Postgres's auto-generated names) — the last was already classified cosmetic by the review itself, and per the standing rule, cosmetic findings don't get a debt entry manufactured for them; the first two are addressed above.
+
+Commit:
+```
+docs: Database Foundation Review cleanup
+
+Mark Database Foundation (Phase 3.1-3.5) and its independent review
+complete in PROJECT_STATUS.md; advance current phase to Roadmap
+Phase 4 (Authentication & Audit Log) - correcting the review's own
+suggested next-phase text, which said Vehicle domain (actually
+Roadmap Phase 13). Fix a stale Decision Record count in the same
+file (12 -> 13).
+
+Amend Database Architecture Section 15 with the smallest possible
+clarification: entity_types' confirmed string-natural-key exception
+to the "every table has a UUID PK" rule, in both Section 15 itself
+and the Quality Review's summary of it. No other sections touched.
+
+TECHNICAL_DEBT.md left unchanged: two entries were drafted for the
+review's remaining findings (Entity.updated_at's ORM-only refresh;
+no written constraint/index naming convention), then removed after
+reconsidering against the file's own established pattern - all 8
+existing entries track real implementation gaps, not documentation
+observations or already-correct behavior notes. Both remain recorded
+in this changelog entry instead. The review's fourth finding (FK
+auto-generated names) was already classified cosmetic and was never
+added anywhere, per the standing rule against manufacturing debt
+entries for acceptable practice.
+
+Documentation and governance only - no application code, models,
+migrations, tests, dependencies, Docker, or CI changed.
+```

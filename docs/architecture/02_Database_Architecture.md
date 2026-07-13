@@ -140,7 +140,7 @@ Archiving uses the same `lifecycle_state` column, value `archived`, with `trashe
 
 ## 15. Primary Key Strategy
 
-**Every table uses a UUID primary key** — including `entities` and every detail and Platform table — never an auto-incrementing integer.
+**Every table uses a UUID primary key** — including `entities` and every detail and Platform table — never an auto-incrementing integer. **One deliberate exception**: `entity_types` (Section 3) is keyed by `entity_type` itself, a string natural key, not a UUID — it is a small, fixed, non-sensitive controlled vocabulary rather than owner-scoped data, so the ID-enumeration rationale below doesn't apply, and every reference to `entity_type` elsewhere in this document already treats it as a readable string, not an opaque ID.
 
 - **Why UUIDs**: sequential integer IDs leak information (how many Vehicles exist, ID-enumeration attacks) that compounds the IDOR risk already flagged as a top security concern (`docs/architecture/00_Engineering_Overview.md`, Section 15); UUIDs also support future scenarios this architecture is explicitly kept open to — merging data across self-hosted instances, or migrating a single-user instance into a hosted multi-tenant one (Section 21) — far more gracefully than integers ever could.
 - **Detail tables use the same UUID as their corresponding `entities` row** — `entity_id` on a detail table is *both* its primary key and its foreign key to `entities.id`, not an independent auto-incrementing key of its own. This is what makes the 1:1 relationship between a base row and its detail row airtight at the schema level, not just a convention two separate keys happen to follow.
@@ -203,7 +203,7 @@ The entire ownership model (Section 2) was designed so this evolution is cheap:
 
 **New architectural calls made within this document**, none of which contradict the four foundational decisions already confirmed (`docs/architecture/00_Engineering_Overview.md`) — these are implementation-level judgment calls made *within* that confirmed direction, the same way Celery (background jobs) and the error-code mapping table were decided without individually re-confirming each with the Product Owner:
 
-- UUID primary keys everywhere, including detail tables sharing their base entity's UUID (Section 15).
+- UUID primary keys everywhere, including detail tables sharing their base entity's UUID (Section 15) — except `entity_types` itself, a deliberate, documented exception (Section 15).
 - `relationships` stored as one row per connection, not two mirrored rows (Section 5).
 - A dedicated `search_index` table, rather than a search vector living directly on `entities` (Section 11) — this refines `docs/architecture/00_Engineering_Overview.md`, Section 7's looser description of a `tsvector` "column on entities" into a cleanly Service-owned table, for the Service Boundary reasons in Section 5 of `01_System_Architecture.md`.
 - An `entity_type` registry/lookup table rather than a database enum (Section 3) — resolves an ambiguity `00_Engineering_Overview.md` left open (it named the column but not its backing mechanism).

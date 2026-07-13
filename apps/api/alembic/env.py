@@ -5,6 +5,13 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
+# Importing app.platform registers every Platform-layer model on
+# Base.metadata before autogenerate compares it against the live database
+# — importing Base alone is not sufficient (a well-documented Alembic
+# requirement: https://alembic.sqlalchemy.org/en/latest/autogenerate.html).
+# app/platform/__init__.py is the single place new Platform models get
+# added; once app/domains/ exists, it will need the same import here.
+import app.platform  # noqa: F401
 from alembic import context
 from app.db.base import Base
 from app.db.session import engine as _app_engine

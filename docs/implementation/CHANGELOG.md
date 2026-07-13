@@ -612,3 +612,42 @@ entries for acceptable practice.
 Documentation and governance only - no application code, models,
 migrations, tests, dependencies, Docker, or CI changed.
 ```
+
+---
+
+## Phase 4.1 - Security Primitives
+
+Verified the official `argon2-cffi` documentation (`argon2-cffi.readthedocs.io`) before writing any code, specifically the `PasswordHasher` class's `hash()`/`verify()` methods and its exception hierarchy (`VerifyMismatchError`, `VerificationError`, `InvalidHashError`), rather than assuming the API.
+
+Completed:
+- `apps/api/app/core/security.py`: three pure functions, no database, no Redis, no FastAPI dependency, no classes beyond the module-level `PasswordHasher` instance the library itself requires
+  - `hash_password(password: str) -> str` — `PasswordHasher().hash(...)`, argon2id with the library's RFC 9106-compliant defaults, no custom parameters
+  - `verify_password(password: str, password_hash: str) -> bool` — catches `VerifyMismatchError` specifically and returns `False`; a malformed/non-argon2 hash still raises `InvalidHashError` rather than silently returning `False`, since that indicates a corrupt stored value, not a wrong password
+  - `generate_csrf_token() -> str` — `secrets.token_urlsafe(32)`
+- `apps/api/tests/test_security.py`: 7 focused unit tests — correct password accepted, wrong password rejected, hash is salted (two hashes of the same password differ), a malformed hash raises rather than silently failing, CSRF tokens are non-empty and unique per call
+- Dependency: `argon2-cffi==25.1.0` added to `apps/api/pyproject.toml` (current stable, verified directly against PyPI) — the only dependency added this sub-phase, no `passlib` wrapper
+
+**One deliberate scope decision**: `verify_password` catches only `VerifyMismatchError`, not the broader `VerificationError`/`InvalidHashError`. This distinguishes "wrong password" (a `bool` the caller should expect) from "the stored hash itself is corrupt or not argon2" (a real error worth surfacing, not masking as a routine failed login) — matching how `verify()`'s own exception hierarchy is documented to distinguish these cases.
+
+Verified:
+- Ruff, Ruff format --check, and mypy (strict) all clean across the whole project (13 source files), no regressions
+- `pytest` — all 7 new tests plus the existing non-infrastructure-dependent suite (8 total) pass
+
+Commit:
+```
+feat(api): add password hashing and CSRF token primitives
+
+Add app/core/security.py: hash_password, verify_password,
+generate_csrf_token - pure functions, no DB/Redis/FastAPI
+dependency. Uses argon2-cffi's PasswordHasher directly (no passlib
+wrapper), verified against the library's official docs before
+implementation. verify_password catches only VerifyMismatchError,
+letting a malformed/corrupt stored hash raise rather than silently
+reporting a routine wrong-password failure.
+
+CSRF tokens via secrets.token_urlsafe(32).
+
+Add argon2-cffi==25.1.0 (current stable) as the only new dependency.
+7 focused unit tests added; Ruff, Ruff format, mypy, and the full
+test suite all clean.
+```

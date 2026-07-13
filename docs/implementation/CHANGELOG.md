@@ -312,3 +312,86 @@ asyncpg/redis/minio dependencies, secrets not yet auto-generated.
 
 No application code, dependencies, or architecture changed.
 ```
+
+---
+
+## Phase 3.1 - SQLAlchemy Engine & Session Foundation
+
+Completed:
+- `apps/api/app/db/base.py`: the declarative `Base`, nothing else
+- `apps/api/app/db/session.py`: async engine + session factory only, reading `settings.database_url` and adapting its scheme (`postgresql://` → `postgresql+asyncpg://`) internally — the driver stays an infrastructure detail, never something written into `.env`
+- Added `sqlalchemy[asyncio]==2.0.51`
+
+Verified beyond static checks: a real `SELECT 1` through `AsyncSessionLocal` against live Postgres in Docker.
+
+One real bug, caught only by running it: `sqlalchemy==2.0.51` alone doesn't install `greenlet`, which SQLAlchemy's async mode requires — confirmed via SQLAlchemy's own docs, which explicitly name this exact scenario (platforms without prebuilt `greenlet` wheels, e.g. Apple Silicon) and the fix (the `[asyncio]` extra). Not a new dependency — a correction to the extras spec on the one already approved.
+
+A follow-up review (requested before starting 3.2) re-audited both files line by line against the same architecture docs plus a byte-level check of `db/__init__.py` against the project's other `__init__.py` files, a repo-wide grep for `postgresql+asyncpg` (found in exactly one place), and a check that `Base.metadata.tables` is genuinely empty. No changes were required — 3.1 was already correct as written.
+
+Commit:
+```
+feat(api): add SQLAlchemy async engine and session foundation
+
+Add app/db/base.py (declarative Base) and app/db/session.py (async
+engine + session factory) — infrastructure only, no models yet.
+Pin sqlalchemy[asyncio]==2.0.51 (the [asyncio] extra is required for
+greenlet on platforms without prebuilt wheels, e.g. Apple Silicon —
+caught by actually connecting, not assumed from the plain package
+name). DATABASE_URL stays a generic postgresql:// URL; the asyncpg
+driver scheme is an internal detail of session.py alone.
+
+Verified: real SELECT 1 against live Postgres in Docker, full existing
+test suite (4/4), ruff/ruff format/mypy all clean.
+```
+
+---
+
+## Phase 3.2 - Alembic Wiring
+
+Completed:
+- Added `alembic==1.18.5` (verified current stable on PyPI, not a pre-release)
+- Scaffolded via Alembic's own official **async template** (`alembic init -t async alembic`) rather than hand-converting the sync template — `apps/api/alembic.ini`, `apps/api/alembic/env.py`, `apps/api/alembic/script.py.mako`, `apps/api/alembic/README` (Alembic's own stock file, not authored here), `apps/api/alembic/versions/` (empty)
+- `env.py` customized to reuse `target_metadata = Base.metadata` (imported from `app.db.base`) so autogenerate sees future models without a duplicate declaration
+- `alembic.ini`'s stock `sqlalchemy.url = driver://user:pass@localhost/dbname` placeholder removed, replaced with a comment explaining the URL intentionally isn't set there
+
+No migrations, tables, models, repositories, services, routers, DTOs, schemas, or seed scripts were created — infrastructure only, per this sub-phase's explicit scope.
+
+**Corrected after initial implementation** (requested review before starting 3.3): the first version of `env.py` reused the application's live `engine` object from `app.db.session` directly for migrations. Re-checked against Alembic's own official async cookbook recipe, which builds an **independent** engine with `poolclass=pool.NullPool` — confirmed the "share a connection" alternative recipe is explicitly for programmatic/testing scenarios, not standard CLI usage, so reusing the app's live engine was a real deviation from the documented default, not a stylistic choice. Fixed: `run_async_migrations` now builds its own dedicated engine with `NullPool` (a one-shot CLI process has no use for the app's connection pool and shouldn't hold pooled connections open after it exits) — while still deriving the URL from the app's already-computed `engine.url` as a plain string, so `DATABASE_URL` keeps exactly one source of truth (`Settings`) without duplicating the `postgresql://` → `postgresql+asyncpg://` conversion logic a second time.
+
+That fix surfaced a second real bug, caught only by actually reconnecting: `str(engine.url)` masks the password with `***` by default — a SQLAlchemy safety default against accidental credential leakage in logs, correct for display but silently unusable for an actual connection. First re-verification attempt failed with `asyncpg.exceptions.InvalidPasswordError`. Fixed by using `engine.url.render_as_string(hide_password=False)` instead.
+
+Verified for real, against live Postgres in Docker, both before and after the correction above:
+- `alembic current` / `alembic history` — both empty, correctly, since no migration files exist yet
+- `alembic revision --autogenerate` — generated a genuinely empty (`pass`/`pass`) migration, correctly detecting zero difference between `Base.metadata` (empty) and the live database (empty); this file was a throwaway proof that the wiring works end-to-end and was deleted immediately after, per this sub-phase's scope
+- Used that throwaway migration to prove `alembic upgrade head` and `alembic downgrade base` both work — applied cleanly, tracked correctly, reverted cleanly
+- **A real, worth-documenting finding**: after `alembic upgrade head` — even with zero real migrations — Alembic creates its own `alembic_version` tracking table as a side effect of running `upgrade` at all (there's simply nothing recorded in it yet). This is expected, standard Alembic behavior, not a bug, and it's exactly what happens on a genuine fresh install too
+- Re-ran with zero migration files present (after removing the throwaway one): `alembic current`/`history`/`upgrade head`/`downgrade base` all correctly no-op
+- One real lint finding: `ruff check` flagged `env.py`'s import order (`I001`) on first run — auto-fixed, re-verified clean
+- Ruff, Ruff format, mypy (10 source files), and the full existing test suite (4/4) all clean, no regressions, both before and after the correction
+
+Commit:
+```
+feat(api): wire Alembic for async migrations
+
+Add alembic==1.18.5 (verified current stable), scaffolded from
+Alembic's own official async template. env.py reuses Base.metadata
+for target_metadata, but builds its own independent engine with
+NullPool for migrations (Alembic's own documented default — a
+one-shot CLI process has no use for the app's connection pool),
+deriving the URL from the app's already-computed engine.url as a
+plain string so DATABASE_URL keeps exactly one source of truth
+(Settings) without duplicating the asyncpg scheme conversion.
+
+Two real bugs, both caught only by actually connecting: (1) an
+earlier version reused the app's live engine directly, a real
+deviation from Alembic's documented async recipe, corrected after
+re-checking official docs; (2) str(engine.url) masks the password
+with "***" by default, which silently broke the connection until
+switched to render_as_string(hide_password=False).
+
+Infrastructure only: no migrations, models, or tables. Verified
+end-to-end against live Postgres in Docker — autogenerate, upgrade,
+and downgrade all confirmed working via a throwaway no-op migration,
+deleted after proving the wiring (a fresh install correctly has an
+empty migration history until Phase 3.3's first real migration).
+```

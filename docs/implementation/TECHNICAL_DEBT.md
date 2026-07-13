@@ -90,15 +90,17 @@ A running log of known gaps, deferred work, and things deliberately left unresol
 
 ---
 
-## apps/api — asyncpg, redis, minio ship as runtime dependencies with no runtime caller yet
+## apps/api — redis, minio ship as runtime dependencies with no runtime caller yet
 
-**Logged:** Foundation Review, post-Phase 1.7 (2026-07-10)
+**Logged:** Foundation Review, post-Phase 1.7 (2026-07-10). **Updated:** Phase 3.1 (2026-07-10) — `asyncpg` resolved, see below.
 
 **Classification:** Our Design Decision — all three were added specifically to deliver the connectivity smoke test required by Phase 1.5/1.6, ahead of any real domain code that will eventually use them for real.
 
-**Issue:** `asyncpg`, `redis`, and `minio` are listed under `[project.dependencies]` (shipped, not dev-only) in `apps/api/pyproject.toml`, but the only import of any of them today is in `tests/test_connectivity.py`. Not dead code — SQLAlchemy 2.0 async (the architecture's fixed ORM choice) pairs naturally with `asyncpg` as its driver — but worth naming so "no callers yet" isn't later mistaken for "unused, safe to remove."
+**Issue:** `redis` and `minio` are listed under `[project.dependencies]` (shipped, not dev-only) in `apps/api/pyproject.toml`, but the only import of either today is in `tests/test_connectivity.py`. Not dead code — worth naming so "no callers yet" isn't later mistaken for "unused, safe to remove."
 
-**Resolution condition:** No action required; this resolves itself naturally once the Database Foundation phase (Roadmap Phase 3) and real Redis/MinIO-consuming features are built. Revisit only if a real domain phase ends up choosing a different driver than expected.
+**`asyncpg` — resolved in Phase 3.1**: `app/db/session.py` now constructs SQLAlchemy's async engine with the `postgresql+asyncpg://` scheme, giving `asyncpg` a real (if indirect, via SQLAlchemy's dialect) caller outside test code. No direct `import asyncpg` exists in application code, and none is expected to — SQLAlchemy owns that boundary now.
+
+**Resolution condition (redis, minio):** No action required; resolves naturally once real Redis-backed sessions/caching and real MinIO-backed Attachments are built. Revisit only if a real phase ends up choosing different clients than expected.
 
 ---
 

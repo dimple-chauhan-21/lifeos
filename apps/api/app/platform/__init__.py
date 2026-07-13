@@ -5,5 +5,5 @@
 # against their official docs), but centralizing it here means adding a
 # new Platform model can never again silently produce an empty migration
 # the way forgetting a one-off import in env.py already did once.
-from app.platform.entities.models import EntityType  # noqa: F401
+from app.platform.entities.models import Entity, EntityType  # noqa: F401
 from app.platform.users.models import User  # noqa: F401

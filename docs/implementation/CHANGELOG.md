@@ -512,3 +512,58 @@ duplicate/null insert attempts; incremental downgrade (-1, not base)
 confirmed entity_types is removed while users persists untouched;
 re-upgrade confirmed clean recreation.
 ```
+
+---
+
+## Phase 3.5 - Entities Table
+
+Re-read all four documents plus every Decision Record before implementing. The column list itself was unambiguous (matches `Database Architecture` §3, §14, Engineering Overview §7, and the Roadmap's Phase 3 deliverables exactly): `id`, `entity_type`, `owner_id`, `name`, `is_favorite`, `lifecycle_state`, `trashed_at`, `created_at`, `updated_at`. Several nullability/default decisions had solid-but-not-explicit textual support and were implemented with documented reasoning rather than blocking: `name` NOT NULL is directly grounded in `Backend Architecture` §23's citation of the "no partial/draft Entity" rule (product `J1.4`) — an entity can't exist half-formed. `is_favorite`/`lifecycle_state` NOT NULL with sensible defaults, and `created_at` NOT NULL with a server default, follow the precedent already set by `users` in Phase 3.3.
+
+**One genuine, confirmed-before-implementing decision**: whether `updated_at` should auto-refresh via SQLAlchemy's `onupdate=func.now()` or only get an initial value on insert, left for a future Service to set explicitly. Confirmed: auto-refresh. Verified this is an **ORM-level** behavior, not a database trigger — it only fires through SQLAlchemy's own update path, not raw SQL — confirmed directly by testing both an ORM update (fired correctly) in this phase.
+
+**One indexing interpretation, resolved with textual grounding rather than a blocking question**: `Database Architecture` §18 says "every foreign key column is indexed," which could be read as requiring a separate index on `entity_type` beyond the composite. But the same section's own enumeration ("every entity_id column... plus owner_id, gets an explicit index") doesn't name `entity_type`, and the very next sentence is the composite index that already covers `owner_id` as its leftmost column — combined with §18's explicit "avoid speculative indexing" principle, implemented **only** the composite index, no separate single-column index on `entity_type`.
+
+Completed:
+- `apps/api/app/platform/entities/models.py`: added `Entity` alongside the existing `EntityType` (same file, no new package, per explicit scope) — all 9 columns, a `CHECK` constraint on `lifecycle_state` (exact 3 values from §12), FKs to `entity_types.entity_type` and `users.id` (no explicit `ondelete` — left at the database default, which prevents deleting a referenced user/entity_type while entities reference them; nothing in the architecture calls for cascade behavior in this direction), and the composite index from §18 verbatim. No `relationship()` attributes, no methods, no computed properties — pure ORM mapping only
+- `apps/api/alembic/versions/0003_create_entities.py`: hand-reviewed against every requested point (columns, nullable flags, FKs, `lifecycle_state` constraint, defaults, indexes, downgrade) — autogenerate got it completely correct on the first attempt, no substantive hand-editing needed, only cosmetic cleanup matching `0001`/`0002`'s style
+- `app/platform/__init__.py` extended with the `Entity` import
+
+Verified for real, against live Postgres in Docker:
+- `alembic upgrade head` — `\d entities` confirms every column, type, nullable flag, and default exactly as designed; PK on `id`; both FKs present with correct targets; `CHECK` constraint present with the exact 3 values; composite index present, no extra single-column index
+- **Real database operations, not just schema inspection**: inserted one valid entity (registered a test `entity_type` row first) — all defaults applied correctly (`is_favorite=false`, `lifecycle_state='active'`, `trashed_at=NULL`, both timestamps populated). Attempted an invalid `owner_id` (rejected: FK violation), an unregistered `entity_type` (rejected: FK violation), an invalid `lifecycle_state` value (rejected: CHECK violation) — all three genuinely rejected by PostgreSQL, not assumed
+- Verified `onupdate` for real: updated a row through the ORM, confirmed `updated_at` genuinely advanced
+- `alembic downgrade -1` — `entities` genuinely removed; `entity_types`' test row and `users`' seeded row both confirmed untouched
+- `alembic upgrade head` again — `entities` recreated empty (correct, no seed data); seed user and the `entity_types` row both confirmed intact throughout
+- A final `--autogenerate` against the complete 3-table schema correctly detected zero diff; throwaway file deleted after
+- Test data (the registered `vehicle` entity_type, the test entity) cleaned up afterward, restoring both tables to empty
+- Ruff, Ruff format, mypy (18 source files), and the full existing test suite (4/4) all clean, no regressions
+
+Commit:
+```
+feat(api): add entities base table
+
+Add Entity to app/platform/entities/models.py, alongside the
+existing EntityType — all 9 columns from Database Architecture §3/
+§14/Engineering Overview §7: id, entity_type, owner_id, name,
+is_favorite, lifecycle_state, trashed_at, created_at, updated_at.
+CHECK constraint on lifecycle_state (active/archived/trashed, §12),
+FKs to entity_types and users (no explicit ondelete — database
+default, since nothing in the architecture calls for cascade in this
+direction), composite index (owner_id, entity_type, lifecycle_state)
+per §18. Pure ORM mapping — no relationships, methods, or computed
+properties.
+
+name NOT NULL is grounded in the "no partial/draft Entity" product
+rule (Backend Architecture §23, citing J1.4). updated_at auto-refresh
+via onupdate=func.now() confirmed with explicit sign-off, and verified
+as ORM-level behavior (fires on ORM updates, not raw SQL) by testing
+both. No separate index on entity_type beyond the composite — grounded
+in §18's own FK-indexing enumeration, which doesn't name it, plus the
+section's explicit anti-speculative-indexing principle.
+
+Verified end-to-end against live Postgres in Docker: real inserts,
+including three genuinely-rejected invalid cases (bad owner_id, bad
+entity_type, bad lifecycle_state); incremental downgrade/upgrade
+confirmed entities is fully independent of entity_types/users; final
+autogenerate confirmed zero diff across the complete 3-table schema.
+```
